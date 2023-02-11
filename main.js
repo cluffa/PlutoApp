@@ -1,45 +1,119 @@
-// main.js
+const electron = require('electron');
+const { Tray, app, Menu, BrowserWindow } = electron;
+const { exec } = require('child_process');
+const { spawnWithWrapper } = require('ctrlc-wrapper');
 
-// Modules to control application life and create native browser window
-const { app, BrowserWindow } = require('electron')
-const path = require('path')
+global.url = "";
 
-const createWindow = () => {
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js')
-    }
-  })
-
-  // and load the index.html of the app.
-  mainWindow.loadFile('index.html')
-
-  // Open the DevTools.
-  // mainWindow.webContents.openDevTools()
+const createMainWindow = (url) => {
+    const mainWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+    })
+    mainWindow.loadURL(url);
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
-  createWindow()
+app.on('ready', () => {
+    function newMenu(serverStatus, ready = false, onQuit = app.quit) {
+        return [
+            { label: serverStatus, enabled: false },
+            { type: 'separator' },
+            { label: 'Open App', click: () => {
+                console.log('Opening Window');
+                createMainWindow(global.url);
+            }, enabled: ready },
+            { label: 'Open Terminal', click: () => { console.log('Open Terminal'); } },
+            { label: 'Quit', click: onQuit}
+        ]
+    }
 
-  app.on('activate', () => {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
-})
+    if (process.platform == 'darwin') {
+        app.dock.hide();
+    } else {
+        app.skipTaskbar(true);
+    }
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+    const tray = new Tray('./icons/icon16.png');
+  
+    var menu = Menu.buildFromTemplate(newMenu('Server Starting'));
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
+    tray.setContextMenu(menu);
+
+    var julia = startPluto();
+
+    julia.stderr.setEncoding('utf8');
+    julia.stderr.on('data', (data) => {
+        if (global.url == "") {
+            data = data.toString().split(" ");
+            data.forEach(str => {
+                if (str.startsWith('http://')) {
+                    menu = Menu.buildFromTemplate(newMenu(
+                        'Server Running',
+                        ready = true,
+                        onQuit = julia.sendCtrlC
+                        ));
+                    tray.setContextMenu(menu);
+                    global.url = str;
+                    console.log('server started at ' + global.url);
+                    return 0;
+                }
+            });
+        }
+    });
+    julia.stderr.pipe(process.stdout);
+
+    app.on('window-all-closed', () => {
+        //if (process.platform !== 'darwin') app.quit()
+        //julia.sendCtrlC();
+    })
+
+    app.on('activate', () => {
+        // On macOS it's common to re-create a window in the app when the
+        // dock icon is clicked and there are no other windows open.
+        if (BrowserWindow.getAllWindows().length === 0) createMainWindow(url)
+    })
+
+    julia.on('exit', function() {
+        app.quit();
+    })
+});
+
+function startPluto() {
+    exec('juliaup config channelsymlinks true');
+    exec('juliaup add beta');
+
+    var child = spawnWithWrapper(
+        'julia-beta',
+        ['-i', '--project=.', 'server.jl'],
+        { 
+            encoding: 'utf8',
+            //shell: true,
+            //detached: true
+        }
+    );
+
+    return child;
+}
+
+function watchOut(data) {
+    if (url == "") {
+        data = data.toString();
+        if (data.includes('Go to http://')) {
+            var strlist = data.split(" ");
+            strlist.forEach(str => {
+                if (str.startsWith('http://')) {
+
+                console.log('server started');
+                menu = Menu.buildFromTemplate(newMenu('Server Running'));
+                tray.setContextMenu(menu);
+                    global.url = str;
+                    return 0;
+                }
+            });
+        }
+    } else {
+        if (data.includes('[ Info: end of file')) {
+            serverStopped = true;
+        }
+    }
+}

@@ -20,6 +20,8 @@
     "electron": "^23.0.0"
   },
   "dependencies": {
-    "electron-squirrel-startup": "^1.0.0"
+    "ctrlc-wrapper": "^0.0.4",
+    "electron-squirrel-startup": "^1.0.0",
+    "tree-kill": "^1.2.2"
   }
 }
