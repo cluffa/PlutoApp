@@ -1,5 +1,11 @@
 module.exports = {
-  packagerConfig: {},
+  packagerConfig: {
+    extraResource : [
+      './icons',
+      './server.jl',
+      './Project.toml'
+    ]
+  },
   rebuildConfig: {},
   makers: [
     {

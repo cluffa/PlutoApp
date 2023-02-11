@@ -27,11 +27,11 @@ app.on('ready', () => {
         ]
     }
 
-    if (process.platform == 'darwin') {
-        app.dock.hide();
-    } else {
-        app.skipTaskbar(true);
-    }
+    // if (process.platform == 'darwin') {
+    //     app.dock.hide();
+    // } else {
+    //     app.skipTaskbar(true);
+    // }
 
     const tray = new Tray('./icons/icon16.png');
   
@@ -39,7 +39,14 @@ app.on('ready', () => {
 
     tray.setContextMenu(menu);
 
-    var julia = startPluto();
+    try {
+        var julia = startPluto();
+    } catch (error) {
+        console.log('failed to start pluto');
+        app.exit();
+    }
+
+    
 
     julia.stderr.setEncoding('utf8');
     julia.stderr.on('data', (data) => {
@@ -84,7 +91,7 @@ function startPluto() {
 
     var child = spawnWithWrapper(
         'julia-beta',
-        ['-i', '--project=.', 'server.jl'],
+        ['-i', 'server.jl'],
         { 
             encoding: 'utf8',
             //shell: true,
