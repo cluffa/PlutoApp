@@ -1,26 +1,32 @@
 {
   "name": "plutoapp",
+  "productName": "plutoapp",
   "version": "1.0.0",
-  "description": "Pluto.jl electron app",
-  "main": "main.js",
+  "description": "My Electron application description",
+  "main": "src/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "electron-forge start",
     "package": "electron-forge package",
-    "make": "electron-forge make"
+    "make": "electron-forge make",
+    "publish": "electron-forge publish",
+    "lint": "echo \"No linting configured\""
   },
-  "author": "Alex Cluff",
+  "keywords": [],
+  "author": {
+    "name": "cluffa",
+    "email": "cluffa@users.noreply.github.com"
+  },
   "license": "MIT",
+  "dependencies": {
+    "ctrlc-wrapper": "^0.0.4",
+    "electron-squirrel-startup": "^1.0.0"
+  },
   "devDependencies": {
     "@electron-forge/cli": "^6.0.5",
     "@electron-forge/maker-deb": "^6.0.5",
     "@electron-forge/maker-rpm": "^6.0.5",
     "@electron-forge/maker-squirrel": "^6.0.5",
     "@electron-forge/maker-zip": "^6.0.5",
-    "electron": "^23.0.0"
-  },
-  "dependencies": {
-    "ctrlc-wrapper": "^0.0.4",
-    "electron-squirrel-startup": "^1.0.0"
+    "electron": "23.0.0"
   }
 }
