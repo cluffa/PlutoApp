@@ -38,8 +38,6 @@ app.on("ready", () => {
   // hide dock icon
   if (process.platform == 'darwin') {
       app.dock.hide();
-  } else {
-      app.skipTaskbar(true);
   }
 
   // Set up tray icon and menu
@@ -88,7 +86,7 @@ function newMenu(
     },
     { type: "separator" },
     {
-      label: "Open App",
+      label: "Open Pluto App",
       click: () => {
         console.log("Opening Window");
         createWindow(url);
@@ -96,7 +94,7 @@ function newMenu(
       enabled: ready,
     },
     {
-      label: "Open App with Dev Tools",
+      label: "Open Pluto App with Dev Tools",
       click: () => {
         console.log("Opening Window");
         createWindow(url, true);
@@ -171,7 +169,15 @@ function getJuliaPath() {
     console.log("default channel: " + defaultChannel);
     const defaultVersion = juliaupConfig.InstalledChannels[defaultChannel].Version;
     console.log("default version: " + defaultVersion);
-    const juliaPath = path.join(juliaupPath, juliaupConfig.InstalledVersions[defaultVersion].Path, "bin", "julia");
+
+    // get julia path for windows
+    if (process.platform == "win32") {
+      var bin = "julia.exe";
+    } else {
+      var bin = "julia";
+    }
+
+    const juliaPath = path.join(juliaupPath, juliaupConfig.InstalledVersions[defaultVersion].Path, "bin", bin);
     console.log("julia path: " + juliaPath);
 
     if (!fs.existsSync(juliaPath)) {
