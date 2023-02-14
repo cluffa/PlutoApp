@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, shell } = require("electron");
+const { app, BrowserWindow, Tray, Menu, shell, dialog } = require("electron");
 const { spawnWithWrapper } = require("ctrlc-wrapper");
 const path = require("path");
 const os = require("os");
@@ -65,7 +65,7 @@ app.on("ready", () => {
   var julia = null;
   julia = startPluto(onFoundURL = () => {
     // createWindow(global.baseURL);
-    menu = newMenu("Server Running", true, julia.sendCtrlC, global.baseURL);
+    menu = newMenu("Server Running", true, julia.sendCtrlC);
     tray.setContextMenu(menu);
   });
 });
@@ -87,8 +87,7 @@ app.on("activate", () => {
 function newMenu(
   serverStatus = "Not Running",
   ready = false,
-  onQuit = app.quit,
-  url = "https://google.com"
+  onQuit = app.quit
 ) {
   return Menu.buildFromTemplate([
     { label: serverStatus, enabled: false },
@@ -105,15 +104,37 @@ function newMenu(
       label: "Open in Browser",
       click: () => {
         console.log("Opening External Window");
-        shell.openExternal(url);
+        shell.openExternal(global.baseURL);
       },
       enabled: ready,
     },
     {
-      label: "Open Pluto App",
+      label: "Open App",
       click: () => {
         console.log("Opening Window");
-        createWindow(url);
+        createWindow(global.baseURL);
+      },
+      enabled: ready,
+    },
+    {
+      label: "Open File in Browser",
+      click: () => {
+        console.log("Opening External Window");
+        let furl = getURLToSelectedFile();
+        if (furl != null) {
+          shell.openExternal(furl);
+        }
+      },
+      enabled: ready,
+    },
+    {
+      label: "Open File in App",
+      click: () => {
+        console.log("Opening Window");
+        const furl = getURLToSelectedFile();
+        if (furl != null) {
+          createWindow(furl);
+        }
       },
       enabled: ready,
     },
@@ -121,7 +142,7 @@ function newMenu(
       label: "Open Pluto App with Dev Tools",
       click: () => {
         console.log("Opening Window");
-        createWindow(url, true);
+        createWindow(global.baseURL, true);
       },
       enabled: ready,
     },
@@ -256,4 +277,25 @@ function setupProjectDir(version) {
   }
 
   return dir;
+}
+
+// converts filepath to url with query parameters for opening in pluto
+function getURLToFile(filepath) {
+  return global.baseURL.replace("/?", "/open?") + "&path=" + encodeURIComponent(filepath);
+}
+
+function selectFile() {
+  let response = dialog.showOpenDialogSync({properties: ['openFile'] })
+  if (response != undefined) {
+    console.log("selected" + response[0]);
+    return response[0];
+  } else {
+    console.log("no file selected");
+    return null;
+  }
+}
+
+// returns url to selected file
+function getURLToSelectedFile() {
+  return getURLToFile(selectFile());
 }
