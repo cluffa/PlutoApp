@@ -1,0 +1,9 @@
+body {
+  background-color: #1d1d1d;
+  color: #fff;
+  font-family: 'Fira Code', monospace;
+  font-size: 1.2rem;
+  line-height: 1.5;
+  margin: 0;
+  padding: 2rem;
+}

@@ -1,5 +1,4 @@
 using Pkg
-Pkg.activate(; temp = true)
 Pkg.add("Pluto")
 
 using Pluto
