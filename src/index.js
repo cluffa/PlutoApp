@@ -5,7 +5,7 @@ const os = require("os");
 const fs = require("fs");
 
 global.baseURL = "";
-global.juliaLog = [];
+var juliaLog = [];
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require("electron-squirrel-startup")) {
@@ -23,8 +23,6 @@ function createWindow(url, dev = false) {
     },
   });
 
-  // and load the index.html of the app.
-  //mainWindow.loadFile(path.join(__dirname, 'index.html'));
   mainWindow.loadURL(url);
 
   // Open the DevTools.
@@ -46,9 +44,7 @@ const createLogWindow = () => {
   logWindow.loadFile(path.join(__dirname, "log.html"));
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
+// main process
 app.on("ready", () => {
   // hide dock icon
   if (process.platform == 'darwin') {
@@ -64,26 +60,27 @@ app.on("ready", () => {
   // Start pluto
   var julia = null;
   julia = startPluto(onFoundURL = () => {
-    // createWindow(global.baseURL);
-    menu = newMenu("Server Running", true, julia.sendCtrlC);
+    // update tray menu
+    menu = newMenu("Server Running", true, () => {
+      // quit app, but first kill julia
+      // should trigger app.quit() on exit event
+      julia.sendCtrlC();
+    });
     tray.setContextMenu(menu);
   });
 });
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+// do nothing when all windows are closed
 app.on("window-all-closed", () => {
   // do nothing, keep tray running
 });
 
+// do nothing when app is activated
 app.on("activate", () => {
   // shouldn't happen, because we hide the dock icon
 });
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.
-
+// create menu
 function newMenu(
   serverStatus = "Not Running",
   ready = false,
@@ -156,10 +153,10 @@ function newMenu(
   ]);
 }
 
+// start pluto server and return child process
+// adds julia into exit sequence
+// adds output to juliaLog
 function startPluto(onFoundURL = () => {}) {
-  //exec("juliaup config channelsymlinks true");
-  //exec("juliaup add beta");
-
   const paths = getJuliaPath();
 
   var child = spawnWithWrapper(
@@ -179,13 +176,23 @@ function startPluto(onFoundURL = () => {}) {
     }
   );
 
+  // handle julia output
   child.stderr.setEncoding("utf8");
   child.stderr.on("data", (data) => {
-    global.juliaLog.push(data);
+    juliaLog.push(data);
     listener(data, onFoundURL);
   });
   child.stderr.pipe(process.stdout);
 
+  // handle ctrl-c in terminal
+  // should wait for julia to stop
+  // and run app.quit() on exit event
+  process.on('SIGINT', () => {
+    console.log("Caught interrupt signal");
+    child.sendCtrlC();
+  });
+
+  // should be final exit event if julia has started
   child.on("exit", function() {
     app.quit();
   })
@@ -194,6 +201,8 @@ function startPluto(onFoundURL = () => {}) {
 }
 
 // listen for julia output to find the server url
+// updates global.baseURL
+// runs onFoundURL when found
 function listener(data, onFoundURL = () => {}) {
   if (global.baseURL == "") {
     data = data.toString();
@@ -211,6 +220,7 @@ function listener(data, onFoundURL = () => {}) {
 }
 
 // get julia path from juliaup config
+// calls setupProjectDir
 function getJuliaPath() {
   const home = os.homedir();
   // check if .julia/juliaup/juliaup.json exists
@@ -252,7 +262,12 @@ function getJuliaPath() {
   }
 }
 
-
+// setup project directory for PlutoApp
+// creates .julia/pluto_notebooks if it doesn't exist
+// creates .julia/PlutoApp if it doesn't exist
+// creates .julia/PlutoApp/environments/<version> if it doesn't exist
+// creates .julia/PlutoApp/logs if it doesn't exist
+// returns path to <version> project directory
 function setupProjectDir(version) {
   const home = os.homedir();
 
@@ -279,11 +294,15 @@ function setupProjectDir(version) {
   return dir;
 }
 
-// converts filepath to url with query parameters for opening in pluto
+// takes a filepath and returns a url to open that file in pluto
+// filepath is URI encoded as it is passed as a query parameter
 function getURLToFile(filepath) {
   return global.baseURL.replace("/?", "/open?") + "&path=" + encodeURIComponent(filepath);
 }
 
+// opens a file dialog and returns the selected filepath
+// returns null if no file is selected
+// runs synchronously
 function selectFile() {
   let response = dialog.showOpenDialogSync({properties: ['openFile'] })
   if (response != undefined) {
