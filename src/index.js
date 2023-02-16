@@ -263,7 +263,7 @@ function setupProjectDir(version) {
   }
 
   // create .julia/PlutoApp/ and subdirectories
-  dir = path.join(home, "PlutoApp");
+  dir = path.join(dir, "PlutoApp");
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir);
     fs.mkdirSync(path.join(dir, "logs"));
