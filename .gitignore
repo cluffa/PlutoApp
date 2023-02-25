@@ -1,3 +1,4 @@
 /target
 Manifest.toml
 .DS_Store
+Cargo.lock
