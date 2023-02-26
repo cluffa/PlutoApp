@@ -1,6 +1,7 @@
 # PlutoApp
-hacked together electron pluto.jl app that runs in the system tray.  
-not finished, tested on macOS and windows  
+Hacked together electron pluto.jl app that runs in the system tray.  
+Does not exit julia processes very well.
+Not finished, only tested on macOS and windows.  
   
 Compared to JuliaPluto/PlutoDesktop, it is much simpler and uses existing julia/juliaup.  
   

@@ -3,59 +3,58 @@ const { spawnWithWrapper } = require("ctrlc-wrapper");
 const path = require("path");
 const os = require("os");
 const fs = require("fs");
+const { FgMagenta, Reset } = require("./colors");
 
 global.baseURL = "";
-var juliaLog = [];
+global.serverStarted = false;
+
+const logPrefix = FgMagenta + "[ PlutoApp:" + Reset;
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require("electron-squirrel-startup")) {
   app.quit();
 }
 
-function createWindow(url, dev = false) {
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
-      nodeIntegration: true,
-    },
-  });
-
-  mainWindow.loadURL(url);
-
-  // Open the DevTools.
-  if (dev) {
-    mainWindow.webContents.openDevTools();
-  }
-}
-
-const createLogWindow = () => {
-  const logWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
-      nodeIntegration: true,
-    },
-  });
-
-  logWindow.loadFile(path.join(__dirname, "log.html"));
-}
-
 // main process
 app.on("ready", () => {
+  startTime = Date.now();
   // hide dock icon
   if (process.platform == 'darwin') {
       app.dock.hide();
   }
 
   // Set up tray icon and menu
-  const tray = new Tray(path.join(__dirname, "icon16.png"));
+  const tray = new Tray(path.join(__dirname, "icons", "icon16-1.png"));
+
   tray.setToolTip("PlutoApp");
   var menu = newMenu("Server Starting");
   tray.setContextMenu(menu);
+
+  var icons = [
+    "icon16-1.png",
+    "icon16-2.png",
+    "icon16-3.png",
+    "icon16-4.png"
+  ]
+  // loading animation, log only works if ms is a multiple of logEvery
+  function loading(idx, startTime, ms, logEvery = 1000) {
+    if (global.serverStarted) {
+      tray.setImage(path.join(__dirname, "icons", "icon16-1.png"));
+      console.log(logPrefix, "stopped loading animation");
+    } else {
+      setTimeout(() => {
+        loading(
+          idx + 1,
+          startTime,
+          ms,
+          logEvery
+          )
+      }, ms)
+      tray.setImage(path.join(__dirname, "icons", icons[idx % icons.length]))
+    }
+  }
+  
+  loading(0, startTime, 250);
 
   // Start pluto
   var julia = null;
@@ -67,7 +66,12 @@ app.on("ready", () => {
       julia.sendCtrlC();
     });
     tray.setContextMenu(menu);
+    global.serverStarted = true;
+    console.log(logPrefix, "global.serverStarted:", global.serverStarted);
+    console.log(logPrefix, "global.baseURL:", global.baseURL);
+    console.log(logPrefix, "done loading in", (Date.now() - startTime) / 1000, "s");
   });
+
 });
 
 // do nothing when all windows are closed
@@ -92,7 +96,7 @@ function newMenu(
       label: "Quit",
       accelerator: "CmdOrCtrl+Q",
       click: () => {
-        console.log("Quitting");
+        console.log(logPrefix, "Quitting");
         onQuit();
       },
     },
@@ -100,62 +104,27 @@ function newMenu(
     {
       label: "Open in Browser",
       click: () => {
-        console.log("Opening External Window");
+        console.log(logPrefix, "Opening External Window");
         shell.openExternal(global.baseURL);
-      },
-      enabled: ready,
-    },
-    {
-      label: "Open App",
-      click: () => {
-        console.log("Opening Window");
-        createWindow(global.baseURL);
       },
       enabled: ready,
     },
     {
       label: "Open File in Browser",
       click: () => {
-        console.log("Opening External Window");
+        console.log(logPrefix, "Opening External Window");
         let furl = getURLToSelectedFile();
         if (furl != null) {
           shell.openExternal(furl);
         }
       },
       enabled: ready,
-    },
-    {
-      label: "Open File in App",
-      click: () => {
-        console.log("Opening Window");
-        const furl = getURLToSelectedFile();
-        if (furl != null) {
-          createWindow(furl);
-        }
-      },
-      enabled: ready,
-    },
-    {
-      label: "Open Pluto App with Dev Tools",
-      click: () => {
-        console.log("Opening Window");
-        createWindow(global.baseURL, true);
-      },
-      enabled: ready,
-    },
-    {
-      label: "Open Logs",
-      click: () => {
-        createLogWindow();
-        console.log("Opening Log Window");
-      },
-    },
+    }
   ]);
 }
 
 // start pluto server and return child process
 // adds julia into exit sequence
-// adds output to juliaLog
 function startPluto(onFoundURL = () => {}) {
   const paths = getJuliaPath();
 
@@ -179,7 +148,6 @@ function startPluto(onFoundURL = () => {}) {
   // handle julia output
   child.stderr.setEncoding("utf8");
   child.stderr.on("data", (data) => {
-    juliaLog.push(data);
     listener(data, onFoundURL);
   });
   child.stderr.pipe(process.stdout);
@@ -188,7 +156,7 @@ function startPluto(onFoundURL = () => {}) {
   // should wait for julia to stop
   // and run app.quit() on exit event
   process.on('SIGINT', () => {
-    console.log("Caught interrupt signal");
+    console.log(logPrefix, "Caught interrupt signal");
     child.sendCtrlC();
   });
 
@@ -210,7 +178,7 @@ function listener(data, onFoundURL = () => {}) {
       var strlist = data.split(" ");
       strlist.forEach((str) => {
         if (str.startsWith("http://")) {
-          console.log("server started");
+          console.log(logPrefix, "server started");
           global.baseURL = str;
           onFoundURL();
         }
@@ -227,13 +195,13 @@ function getJuliaPath() {
   const juliaupPath = path.join(home, ".julia", "juliaup");
   const juliaupConfigPath = path.join(juliaupPath, "juliaup.json");
   if (fs.existsSync(juliaupConfigPath)) {
-    console.log("juliaup.json found");
+    console.log(logPrefix, "juliaup.json found");
     const juliaupConfig = JSON.parse(fs.readFileSync(juliaupConfigPath, "utf8"));
-    // console.log(juliaupConfig);
+    // console.log(logPrefix, juliaupConfig);
     const defaultChannel = juliaupConfig.Default;
-    console.log("default channel: " + defaultChannel);
+    console.log(logPrefix, "default channel: " + defaultChannel);
     const defaultVersion = juliaupConfig.InstalledChannels[defaultChannel].Version;
-    console.log("default version: " + defaultVersion);
+    console.log(logPrefix, "default version: " + defaultVersion);
     const projectPath = setupProjectDir(defaultVersion);
 
     setupProjectDir(defaultVersion);
@@ -246,7 +214,7 @@ function getJuliaPath() {
     }
 
     const juliaPath = path.join(juliaupPath, juliaupConfig.InstalledVersions[defaultVersion].Path, "bin", bin);
-    console.log("julia path: " + juliaPath);
+    console.log(logPrefix, "julia path: " + juliaPath);
 
     if (!fs.existsSync(juliaPath)) {
       // throw error
@@ -306,10 +274,10 @@ function getURLToFile(filepath) {
 function selectFile() {
   let response = dialog.showOpenDialogSync({properties: ['openFile'] })
   if (response != undefined) {
-    console.log("selected" + response[0]);
+    console.log(logPrefix, "selected" + response[0]);
     return response[0];
   } else {
-    console.log("no file selected");
+    console.log(logPrefix, "no file selected");
     return null;
   }
 }
